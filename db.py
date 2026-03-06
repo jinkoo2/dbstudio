@@ -7,8 +7,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 import pyodbc
 
-# Load .env from parent directory (projects/dbstudio/.env)
-_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+# Load .env from same directory as this file
+_ENV_PATH = Path(__file__).resolve().parent / ".env"
 load_dotenv(_ENV_PATH)
 
 
