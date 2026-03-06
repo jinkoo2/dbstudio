@@ -400,53 +400,6 @@ body {
 }
 #sql-panel.active { display: flex; }
 
-#sql-connection {
-    display: flex;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--bg-panel);
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-    align-items: center;
-}
-#sql-connection label {
-    font-size: 11px;
-    color: var(--text-muted);
-}
-#sql-connection input {
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-input);
-    color: var(--text);
-    font-size: 12px;
-    outline: none;
-    width: 130px;
-}
-#sql-connection input:focus { border-color: var(--accent); }
-#sql-connect-btn {
-    padding: 4px 12px;
-    border: 1px solid var(--accent);
-    border-radius: 4px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 12px;
-    cursor: pointer;
-    font-weight: 600;
-}
-#sql-connect-btn:hover { background: var(--accent-hover); }
-#sql-connect-btn.connected {
-    background: var(--danger);
-    border-color: var(--danger);
-}
-#sql-status {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-left: 4px;
-}
-#sql-status.ok { color: var(--node-snake); }
-#sql-status.err { color: var(--danger); }
-
 #sql-editor-area {
     display: flex;
     flex-direction: column;
@@ -578,17 +531,6 @@ body {
 
         <!-- SQL Query tab -->
         <div id="sql-panel">
-            <div id="sql-connection">
-                <label>Server</label>
-                <input id="sql-server" type="text" placeholder="hostname\instance">
-                <label>Database</label>
-                <input id="sql-database" type="text" value="VARIAN" placeholder="VARIAN">
-                <label>User</label>
-                <input id="sql-user" type="text" placeholder="username">
-                <label>Password</label>
-                <input id="sql-password" type="password" placeholder="password">
-                <span id="sql-status"></span>
-            </div>
             <div id="sql-editor-area">
                 <textarea id="sql-editor" placeholder="SELECT TOP 10 * FROM Patient" spellcheck="false"></textarea>
                 <div id="sql-run-bar">
@@ -639,6 +581,7 @@ body {
 <div id="ctx-menu">
     <div class="ctx-item" id="ctx-expand">Expand neighbors</div>
     <div class="ctx-item" id="ctx-select">Select / Show details</div>
+    <div class="ctx-item" id="ctx-query">SELECT TOP 10 *</div>
     <div class="ctx-sep"></div>
     <div class="ctx-item" id="ctx-remove" style="color:var(--danger)">Remove from canvas</div>
 </div>
@@ -1216,6 +1159,17 @@ document.getElementById('ctx-select').onclick = function() {
     if (ctxTarget) selectEntity(ctxTarget);
     hideContextMenu();
 };
+document.getElementById('ctx-query').onclick = function() {
+    if (ctxTarget) {
+        const table = ctxTarget;
+        hideContextMenu();
+        switchTab('sql');
+        document.getElementById('sql-editor').value = `SELECT TOP 10 * FROM ${table}`;
+        runSQL();
+    } else {
+        hideContextMenu();
+    }
+};
 document.getElementById('ctx-remove').onclick = function() {
     if (ctxTarget) removeEntity(ctxTarget);
     hideContextMenu();
@@ -1256,57 +1210,13 @@ function switchTab(tab) {
     } else {
         cyContainer.classList.add('hidden');
         sqlPanel.classList.add('active');
-        loadSQLConnection();
     }
 }
-
-// ── SQL Connection localStorage ──
-const SQL_STORAGE_KEY = 'dbstudio-connection';
-
-function saveSQLConnection() {
-    const conn = {
-        server: document.getElementById('sql-server').value,
-        database: document.getElementById('sql-database').value,
-        user: document.getElementById('sql-user').value,
-    };
-    localStorage.setItem(SQL_STORAGE_KEY, JSON.stringify(conn));
-}
-
-function loadSQLConnection() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(SQL_STORAGE_KEY));
-        if (saved) {
-            if (saved.server) document.getElementById('sql-server').value = saved.server;
-            if (saved.database) document.getElementById('sql-database').value = saved.database;
-            if (saved.user) document.getElementById('sql-user').value = saved.user;
-        }
-    } catch(e) {}
-}
-
-// Save connection fields on change
-['sql-server', 'sql-database', 'sql-user'].forEach(id => {
-    document.getElementById(id).addEventListener('change', saveSQLConnection);
-});
-
-// Load on startup
-loadSQLConnection();
 
 // ── SQL Query Execution ──
 async function runSQL() {
     const query = document.getElementById('sql-editor').value.trim();
     if (!query) return;
-
-    const server = document.getElementById('sql-server').value.trim();
-    const database = document.getElementById('sql-database').value.trim();
-    const user = document.getElementById('sql-user').value.trim();
-    const password = document.getElementById('sql-password').value;
-
-    if (!server || !user) {
-        showSQLMessage('Please fill in Server and User fields', true);
-        return;
-    }
-
-    saveSQLConnection();
 
     const btn = document.getElementById('sql-run-btn');
     btn.disabled = true;
@@ -1318,7 +1228,7 @@ async function runSQL() {
         const resp = await fetch('/api/query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ server, database, user, password, query })
+            body: JSON.stringify({ query })
         });
 
         const result = await resp.json();

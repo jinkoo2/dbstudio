@@ -27,10 +27,6 @@ MAX_ROWS = 1000
 
 
 class QueryRequest(BaseModel):
-    server: str
-    database: str = "VARIAN"
-    user: str
-    password: str
     query: str
 
 
@@ -114,17 +110,8 @@ def run_query(req: QueryRequest):
     if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    driver = get_config()["driver"]
-    conn_str = (
-        f"DRIVER={{{driver}}};"
-        f"SERVER={req.server};"
-        f"DATABASE={req.database};"
-        f"UID={req.user};"
-        f"PWD={req.password}"
-    )
-
     try:
-        conn = pyodbc.connect(conn_str, timeout=10)
+        conn = connect()
     except pyodbc.Error as e:
         raise HTTPException(status_code=400, detail=f"Connection failed: {e}")
 
