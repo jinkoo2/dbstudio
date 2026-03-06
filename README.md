@@ -6,6 +6,7 @@ Web-based SQL Server database explorer with an interactive ER diagram viewer and
 
 - **ER Diagram** -- Interactive entity-relationship graph (Cytoscape.js) with search, expand, and detail panel
 - **SQL Query** -- Execute queries against SQL Server with tabular results, row limits, and execution timing
+- **Context menu** -- Right-click any table in the ER diagram to run `SELECT TOP 10 *`
 - **Auto-generation** -- Schema data files are generated from the database on first startup if missing
 - **Dark/Light theme** -- Toggle between dark and light mode
 
@@ -76,7 +77,7 @@ dbstudio/
 |---|---|---|
 | `GET` | `/` | Redirect to `/static/index.html` |
 | `GET` | `/api/data` | Returns `entity-relations.json` |
-| `POST` | `/api/query` | Execute SQL query (body: `{server, database, user, password, query}`) |
+| `POST` | `/api/query` | Execute SQL query (body: `{query}`). DB credentials come from `.env`. |
 
 ## Data Generation
 
