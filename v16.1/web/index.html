@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Studio</title>
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/layout-base@2.0.1/layout-base.js"></script>
+<script src="https://unpkg.com/cose-base@2.2.0/cose-base.js"></script>
+<script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+<style>
+:root {
+    --bg: #1e1e2e;
+    --bg-panel: #282840;
+    --bg-input: #333352;
+    --text: #e0e0f0;
+    --text-muted: #8888aa;
+    --border: #444466;
+    --accent: #7c8af5;
+    --accent-hover: #9aa0ff;
+    --node-camel: #5b8def;
+    --node-snake: #4ec9a0;
+    --node-camel-text: #ffffff;
+    --node-snake-text: #ffffff;
+    --edge-color: #555577;
+    --highlight: #ffd866;
+    --danger: #f85858;
+    --scrollbar-thumb: #555577;
+    --scrollbar-track: #1e1e2e;
+}
+.light {
+    --bg: #f5f5fa;
+    --bg-panel: #ffffff;
+    --bg-input: #eeeef4;
+    --text: #2c2c3a;
+    --text-muted: #666688;
+    --border: #ccccdd;
+    --accent: #5566dd;
+    --accent-hover: #4455cc;
+    --node-camel: #3a6fd8;
+    --node-snake: #2a9d6e;
+    --node-camel-text: #ffffff;
+    --node-snake-text: #ffffff;
+    --edge-color: #aaaacc;
+    --highlight: #e6a800;
+    --danger: #d03030;
+    --scrollbar-thumb: #ccccdd;
+    --scrollbar-track: #f5f5fa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+/* Header */
+#header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+#header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--accent);
+}
+#search-box {
+    position: relative;
+    flex: 0 1 300px;
+    min-width: 180px;
+}
+#search-input {
+    width: 100%;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-input);
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+}
+#search-input:focus { border-color: var(--accent); }
+#search-input::placeholder { color: var(--text-muted); }
+#search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    z-index: 100;
+    display: none;
+}
+#search-results .sr-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+}
+#search-results .sr-item:hover,
+#search-results .sr-item.active { background: var(--bg-input); }
+#search-results .sr-item .sr-match { color: var(--highlight); font-weight: 600; }
+.quick-btns {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.quick-btns button, .toolbar button, #theme-toggle {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+}
+.quick-btns button:hover, .toolbar button:hover, #theme-toggle:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+#theme-toggle { margin-left: auto; }
+
+/* Main layout */
+#main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Left sidebar */
+#left-panel {
+    width: 220px;
+    min-width: 180px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+#left-panel .panel-header {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+}
+#table-filter {
+    margin: 8px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+}
+#table-filter:focus { border-color: var(--accent); }
+#table-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 4px 8px;
+}
+#table-list .tl-item {
+    padding: 3px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#table-list .tl-item:hover { background: var(--bg-input); }
+#table-list .tl-item.on-canvas { color: var(--accent); font-weight: 600; }
+#table-list .tl-item.camel { border-left: 3px solid var(--node-camel); }
+#table-list .tl-item.snake { border-left: 3px solid var(--node-snake); }
+
+/* Canvas */
+#cy-container {
+    flex: 1;
+    position: relative;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+}
+#cy-container.hidden { display: none; }
+#cy {
+    width: 100%;
+    flex: 1;
+}
+#canvas-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--text-muted);
+    pointer-events: none;
+    font-size: 15px;
+    line-height: 2;
+}
+#canvas-hint.hidden { display: none; }
+
+/* Right panel */
+#right-panel {
+    width: 300px;
+    min-width: 240px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+#right-panel .panel-header {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#detail-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+    font-size: 12px;
+}
+#detail-content .empty-msg {
+    color: var(--text-muted);
+    text-align: center;
+    padding: 40px 0;
+}
+.detail-section { margin-bottom: 12px; }
+.detail-section h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+}
+.detail-section .entity-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    word-break: break-all;
+}
+.detail-section .pk-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    margin: 2px 2px 2px 0;
+}
+.col-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+.col-table th {
+    text-align: left;
+    padding: 3px 6px;
+    background: var(--bg-input);
+    color: var(--text-muted);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+}
+.col-table td {
+    padding: 2px 6px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+.col-table .col-pk { color: var(--highlight); font-weight: 600; }
+.col-table .col-fk { color: var(--accent); }
+.col-table .col-nullable { color: var(--text-muted); font-style: italic; }
+.rel-item {
+    padding: 3px 0;
+    cursor: pointer;
+    display: flex;
+    gap: 4px;
+    align-items: baseline;
+}
+.rel-item:hover { color: var(--accent); }
+.rel-item .rel-arrow { color: var(--text-muted); font-size: 10px; }
+.rel-item .rel-col { color: var(--text-muted); font-size: 10px; }
+
+/* Bottom toolbar */
+#toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.toolbar { display: flex; gap: 4px; align-items: center; }
+.toolbar label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-right: 2px;
+}
+#stats {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* Context menu */
+#ctx-menu {
+    position: fixed;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 0;
+    z-index: 200;
+    display: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    min-width: 160px;
+}
+#ctx-menu .ctx-item {
+    padding: 6px 16px;
+    font-size: 12px;
+    cursor: pointer;
+}
+#ctx-menu .ctx-item:hover { background: var(--bg-input); }
+#ctx-menu .ctx-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+
+/* Tab bar */
+#tab-bar {
+    display: flex;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+#tab-bar .tab {
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+}
+#tab-bar .tab:hover { color: var(--text); }
+#tab-bar .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* Center area wrapper */
+#center-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+/* SQL panel */
+#sql-panel {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+#sql-panel.active { display: flex; }
+
+#sql-connection {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    align-items: center;
+}
+#sql-connection label {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+#sql-connection input {
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+    width: 130px;
+}
+#sql-connection input:focus { border-color: var(--accent); }
+#sql-connect-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+}
+#sql-connect-btn:hover { background: var(--accent-hover); }
+#sql-connect-btn.connected {
+    background: var(--danger);
+    border-color: var(--danger);
+}
+#sql-status {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+#sql-status.ok { color: var(--node-snake); }
+#sql-status.err { color: var(--danger); }
+
+#sql-editor-area {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    gap: 6px;
+}
+#sql-editor {
+    width: 100%;
+    min-height: 100px;
+    max-height: 300px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text);
+    font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+    tab-size: 4;
+}
+#sql-editor:focus { border-color: var(--accent); }
+#sql-run-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+#sql-run-btn {
+    padding: 4px 16px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+}
+#sql-run-btn:hover { background: var(--accent-hover); }
+#sql-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+#sql-run-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+#sql-message {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 0 4px;
+    min-height: 18px;
+}
+#sql-message.err { color: var(--danger); }
+
+#sql-results-wrap {
+    flex: 1;
+    overflow: auto;
+    padding: 0 12px 12px;
+}
+#sql-results {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+}
+#sql-results th {
+    text-align: left;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    color: var(--text-muted);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+#sql-results td {
+    padding: 3px 8px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#sql-results tr:hover td { background: var(--bg-input); }
+#sql-results .null-val { color: var(--text-muted); font-style: italic; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+    <h1>DB Studio</h1>
+    <div id="search-box">
+        <input id="search-input" type="text" placeholder="Search tables..." autocomplete="off">
+        <div id="search-results"></div>
+    </div>
+    <div class="quick-btns">
+        <button onclick="addEntity('Patient')">Patient</button>
+        <button onclick="addEntity('Course')">Course</button>
+        <button onclick="addEntity('PlanSetup')">PlanSetup</button>
+        <button onclick="addEntity('Image')">Image</button>
+        <button onclick="addEntity('Series')">Series</button>
+    </div>
+    <button id="theme-toggle" onclick="toggleTheme()">Light</button>
+</div>
+
+<!-- Main -->
+<div id="main">
+    <!-- Left sidebar -->
+    <div id="left-panel">
+        <div class="panel-header">Tables <span id="table-count"></span></div>
+        <input id="table-filter" type="text" placeholder="Filter...">
+        <div id="table-list"></div>
+    </div>
+
+    <!-- Center area with tabs -->
+    <div id="center-area">
+        <div id="tab-bar">
+            <div class="tab active" data-tab="er" onclick="switchTab('er')">ER Diagram</div>
+            <div class="tab" data-tab="sql" onclick="switchTab('sql')">SQL Query</div>
+        </div>
+
+        <!-- ER Diagram tab (Cytoscape canvas) -->
+        <div id="cy-container">
+            <div id="cy"></div>
+            <div id="canvas-hint">
+                Search for a table or click one in the sidebar to begin.<br>
+                Double-click a node to expand its neighbors.
+            </div>
+        </div>
+
+        <!-- SQL Query tab -->
+        <div id="sql-panel">
+            <div id="sql-connection">
+                <label>Server</label>
+                <input id="sql-server" type="text" placeholder="hostname\instance">
+                <label>Database</label>
+                <input id="sql-database" type="text" value="VARIAN" placeholder="VARIAN">
+                <label>User</label>
+                <input id="sql-user" type="text" placeholder="username">
+                <label>Password</label>
+                <input id="sql-password" type="password" placeholder="password">
+                <span id="sql-status"></span>
+            </div>
+            <div id="sql-editor-area">
+                <textarea id="sql-editor" placeholder="SELECT TOP 10 * FROM Patient" spellcheck="false"></textarea>
+                <div id="sql-run-bar">
+                    <button id="sql-run-btn" onclick="runSQL()">Run</button>
+                    <span id="sql-run-hint">Ctrl+Enter to execute</span>
+                </div>
+                <div id="sql-message"></div>
+            </div>
+            <div id="sql-results-wrap">
+                <table id="sql-results"></table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right panel -->
+    <div id="right-panel">
+        <div class="panel-header">
+            <span>Details</span>
+            <span id="detail-close" style="cursor:pointer;display:none" onclick="clearSelection()">&times;</span>
+        </div>
+        <div id="detail-content">
+            <div class="empty-msg">Select a table to view details</div>
+        </div>
+    </div>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+    <div class="toolbar">
+        <label>Zoom:</label>
+        <button onclick="cy.zoom(cy.zoom()*1.3);cy.center()">+</button>
+        <button onclick="cy.zoom(cy.zoom()/1.3);cy.center()">&minus;</button>
+        <button onclick="cy.fit(undefined,30)">Fit</button>
+    </div>
+    <div class="toolbar">
+        <label>Layout:</label>
+        <button onclick="runLayout('fcose')">fcose</button>
+        <button onclick="runLayout('circle')">circle</button>
+        <button onclick="runLayout('grid')">grid</button>
+    </div>
+    <div class="toolbar">
+        <button onclick="clearCanvas()" style="color:var(--danger)">Clear</button>
+    </div>
+    <div id="stats"></div>
+</div>
+
+<!-- Context menu -->
+<div id="ctx-menu">
+    <div class="ctx-item" id="ctx-expand">Expand neighbors</div>
+    <div class="ctx-item" id="ctx-select">Select / Show details</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" id="ctx-remove" style="color:var(--danger)">Remove from canvas</div>
+</div>
+
+<script>
+// ── Global state ──
+let data = null;          // { entities, relationships, metadata }
+let cy = null;            // Cytoscape instance
+let entityNames = [];     // sorted list of all entity names
+let onCanvas = new Set(); // entity names currently on the canvas
+let selectedEntity = null;
+let fkColumns = {};       // entityName -> Set of FK column names
+
+// ── Data loading ──
+fetch('/api/data')
+    .then(r => r.json())
+    .then(d => { data = d; init(); })
+    .catch(e => { document.getElementById('canvas-hint').textContent = 'Failed to load data: ' + e; });
+
+function init() {
+    entityNames = Object.keys(data.entities).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+    // Pre-compute FK columns per entity
+    for (const rel of data.relationships) {
+        if (!fkColumns[rel.fromTable]) fkColumns[rel.fromTable] = new Set();
+        fkColumns[rel.fromTable].add(rel.fromColumn);
+    }
+
+    buildTableList();
+    initCytoscape();
+    updateStats();
+    document.getElementById('table-count').textContent = `(${entityNames.length})`;
+}
+
+// ── Table list (left sidebar) ──
+function isCamelCase(name) {
+    return /^[A-Z]/.test(name) && !name.includes('_');
+}
+
+function buildTableList(filter) {
+    const list = document.getElementById('table-list');
+    const frag = document.createDocumentFragment();
+    const f = (filter || '').toLowerCase();
+    let count = 0;
+    for (const name of entityNames) {
+        if (f && !name.toLowerCase().includes(f)) continue;
+        count++;
+        const div = document.createElement('div');
+        div.className = 'tl-item ' + (isCamelCase(name) ? 'camel' : 'snake');
+        if (onCanvas.has(name)) div.classList.add('on-canvas');
+        div.textContent = name;
+        div.title = name;
+        div.onclick = () => addEntity(name);
+        frag.appendChild(div);
+    }
+    list.innerHTML = '';
+    list.appendChild(frag);
+}
+
+document.getElementById('table-filter').addEventListener('input', function() {
+    buildTableList(this.value);
+});
+
+// ── Search (header) ──
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+let searchIdx = -1;
+let searchMatches = [];
+
+searchInput.addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    searchResults.innerHTML = '';
+    searchIdx = -1;
+    if (!q || !data) { searchResults.style.display = 'none'; return; }
+
+    searchMatches = entityNames.filter(n => n.toLowerCase().includes(q)).slice(0, 30);
+    if (!searchMatches.length) { searchResults.style.display = 'none'; return; }
+
+    for (const name of searchMatches) {
+        const div = document.createElement('div');
+        div.className = 'sr-item';
+        // Highlight match
+        const idx = name.toLowerCase().indexOf(q);
+        div.innerHTML =
+            escHtml(name.substring(0, idx)) +
+            '<span class="sr-match">' + escHtml(name.substring(idx, idx + q.length)) + '</span>' +
+            escHtml(name.substring(idx + q.length));
+        div.onclick = () => { addEntity(name); closeSearch(); };
+        searchResults.appendChild(div);
+    }
+    searchResults.style.display = 'block';
+});
+
+searchInput.addEventListener('keydown', function(e) {
+    const items = searchResults.querySelectorAll('.sr-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        searchIdx = Math.min(searchIdx + 1, items.length - 1);
+        items.forEach((el, i) => el.classList.toggle('active', i === searchIdx));
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        searchIdx = Math.max(searchIdx - 1, 0);
+        items.forEach((el, i) => el.classList.toggle('active', i === searchIdx));
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (searchIdx >= 0 && searchMatches[searchIdx]) {
+            addEntity(searchMatches[searchIdx]);
+            closeSearch();
+        } else if (searchMatches.length) {
+            addEntity(searchMatches[0]);
+            closeSearch();
+        }
+    } else if (e.key === 'Escape') {
+        closeSearch();
+    }
+});
+
+document.addEventListener('click', function(e) {
+    if (!document.getElementById('search-box').contains(e.target)) closeSearch();
+});
+
+function closeSearch() {
+    searchResults.style.display = 'none';
+    searchInput.value = '';
+    searchIdx = -1;
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Cytoscape setup ──
+function initCytoscape() {
+    cy = cytoscape({
+        container: document.getElementById('cy'),
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'label': 'data(label)',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'font-size': '11px',
+                    'font-family': 'Segoe UI, system-ui, sans-serif',
+                    'font-weight': '600',
+                    'color': '#ffffff',
+                    'text-outline-width': 0,
+                    'background-color': 'data(color)',
+                    'width': 'label',
+                    'height': 30,
+                    'padding': '8px',
+                    'shape': 'round-rectangle',
+                    'border-width': 2,
+                    'border-color': 'data(borderColor)',
+                    'text-max-width': '200px',
+                    'text-wrap': 'ellipsis',
+                }
+            },
+            {
+                selector: 'node:selected',
+                style: {
+                    'border-color': '#ffd866',
+                    'border-width': 3,
+                }
+            },
+            {
+                selector: 'node.highlighted',
+                style: {
+                    'border-color': '#ffd866',
+                    'border-width': 3,
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 1.5,
+                    'line-color': '#555577',
+                    'target-arrow-color': '#555577',
+                    'target-arrow-shape': 'triangle',
+                    'curve-style': 'bezier',
+                    'arrow-scale': 0.8,
+                    'label': 'data(label)',
+                    'font-size': '8px',
+                    'color': '#888',
+                    'text-rotation': 'autorotate',
+                    'text-margin-y': -8,
+                    'text-opacity': 0,
+                }
+            },
+            {
+                selector: 'edge:selected',
+                style: {
+                    'line-color': '#ffd866',
+                    'target-arrow-color': '#ffd866',
+                    'width': 2.5,
+                    'text-opacity': 1,
+                }
+            },
+            {
+                selector: 'edge.highlighted',
+                style: {
+                    'line-color': '#7c8af5',
+                    'target-arrow-color': '#7c8af5',
+                    'width': 2,
+                    'text-opacity': 1,
+                }
+            }
+        ],
+        layout: { name: 'preset' },
+        wheelSensitivity: 0.3,
+        minZoom: 0.1,
+        maxZoom: 5,
+    });
+
+    // Click node => select + show details
+    cy.on('tap', 'node', function(e) {
+        selectEntity(e.target.data('id'));
+    });
+
+    // Double-click node => expand neighbors
+    cy.on('dbltap', 'node', function(e) {
+        expandEntity(e.target.data('id'));
+    });
+
+    // Click background => deselect
+    cy.on('tap', function(e) {
+        if (e.target === cy) clearSelection();
+    });
+
+    // Right-click => context menu
+    cy.on('cxttap', 'node', function(e) {
+        const evt = e.originalEvent;
+        showContextMenu(evt, e.target.data('id'));
+    });
+
+    // Hide context menu on canvas interaction
+    cy.on('tap pan zoom', function() { hideContextMenu(); });
+}
+
+// ── Entity operations ──
+function getNeighborRels(entityName) {
+    return data.relationships.filter(r => r.fromTable === entityName || r.toTable === entityName);
+}
+
+function getNeighborNames(entityName) {
+    const names = new Set();
+    for (const r of getNeighborRels(entityName)) {
+        if (r.fromTable === entityName) names.add(r.toTable);
+        else names.add(r.fromTable);
+    }
+    return names;
+}
+
+function nodeColor(name) {
+    return isCamelCase(name) ? getComputedStyle(document.documentElement).getPropertyValue('--node-camel').trim()
+                              : getComputedStyle(document.documentElement).getPropertyValue('--node-snake').trim();
+}
+
+function nodeBorderColor(name) {
+    const c = nodeColor(name);
+    // Darken slightly for border
+    return c;
+}
+
+function addEntity(name, skipLayout) {
+    if (!data || !data.entities[name]) return;
+
+    document.getElementById('canvas-hint').classList.add('hidden');
+
+    // Add center node if not on canvas
+    if (!onCanvas.has(name)) {
+        onCanvas.add(name);
+        cy.add({
+            group: 'nodes',
+            data: {
+                id: name,
+                label: name,
+                color: nodeColor(name),
+                borderColor: nodeBorderColor(name),
+            }
+        });
+    }
+
+    // Add neighbors
+    const rels = getNeighborRels(name);
+    const newNodes = [];
+    for (const r of rels) {
+        const neighbor = r.fromTable === name ? r.toTable : r.fromTable;
+        if (!onCanvas.has(neighbor) && data.entities[neighbor]) {
+            onCanvas.add(neighbor);
+            newNodes.push(neighbor);
+            cy.add({
+                group: 'nodes',
+                data: {
+                    id: neighbor,
+                    label: neighbor,
+                    color: nodeColor(neighbor),
+                    borderColor: nodeBorderColor(neighbor),
+                }
+            });
+        }
+    }
+
+    // Add edges for all relationships between on-canvas entities
+    addEdgesForOnCanvas();
+
+    buildTableList(document.getElementById('table-filter').value);
+    updateStats();
+
+    if (!skipLayout) {
+        runLayout('fcose');
+    }
+
+    // Select the added entity
+    selectEntity(name);
+}
+
+function addEdgesForOnCanvas() {
+    // Add any missing edges between nodes that are on canvas
+    const existingEdges = new Set();
+    cy.edges().forEach(e => existingEdges.add(e.data('id')));
+
+    for (const r of data.relationships) {
+        if (onCanvas.has(r.fromTable) && onCanvas.has(r.toTable)) {
+            const edgeId = r.fromTable + '→' + r.toTable + '.' + r.fromColumn;
+            if (!existingEdges.has(edgeId)) {
+                existingEdges.add(edgeId);
+                cy.add({
+                    group: 'edges',
+                    data: {
+                        id: edgeId,
+                        source: r.fromTable,
+                        target: r.toTable,
+                        label: r.fromColumn + ' → ' + r.toColumn,
+                        relType: r.type,
+                    }
+                });
+            }
+        }
+    }
+}
+
+function expandEntity(name) {
+    if (!data || !data.entities[name]) return;
+    addEntity(name, false);
+}
+
+function removeEntity(name) {
+    const node = cy.getElementById(name);
+    if (node.length) {
+        // Remove connected edges
+        node.connectedEdges().remove();
+        node.remove();
+        onCanvas.delete(name);
+
+        // Remove orphaned edges
+        // (edges where source or target no longer exist are auto-removed)
+
+        if (selectedEntity === name) clearSelection();
+        buildTableList(document.getElementById('table-filter').value);
+        updateStats();
+    }
+}
+
+// ── Selection & Details ──
+function selectEntity(name) {
+    selectedEntity = name;
+
+    // Highlight in graph
+    cy.elements().removeClass('highlighted');
+    const node = cy.getElementById(name);
+    if (node.length) {
+        cy.nodes().unselect();
+        node.select();
+        node.connectedEdges().addClass('highlighted');
+    }
+
+    showDetails(name);
+}
+
+function clearSelection() {
+    selectedEntity = null;
+    cy.elements().removeClass('highlighted').unselect();
+    document.getElementById('detail-close').style.display = 'none';
+    document.getElementById('detail-content').innerHTML = '<div class="empty-msg">Select a table to view details</div>';
+}
+
+function showDetails(name) {
+    const ent = data.entities[name];
+    if (!ent) return;
+
+    document.getElementById('detail-close').style.display = 'inline';
+    const dc = document.getElementById('detail-content');
+
+    const pkSet = new Set(ent.primaryKey || []);
+    const fkSet = fkColumns[name] || new Set();
+
+    // Relationships
+    const outRels = data.relationships.filter(r => r.fromTable === name);
+    const inRels = data.relationships.filter(r => r.toTable === name);
+
+    let html = '';
+
+    // Entity name
+    html += '<div class="detail-section">';
+    html += '<h3>Entity</h3>';
+    html += '<div class="entity-name">' + escHtml(name) + '</div>';
+    if (ent.primaryKey && ent.primaryKey.length) {
+        html += '<div style="margin-top:4px">';
+        for (const pk of ent.primaryKey) html += '<span class="pk-badge">PK: ' + escHtml(pk) + '</span> ';
+        html += '</div>';
+    }
+    html += '<div style="margin-top:4px;color:var(--text-muted);font-size:11px">';
+    html += (isCamelCase(name) ? 'CamelCase' : 'snake_case') + ' &middot; ';
+    html += ent.columns.length + ' columns &middot; ';
+    html += (outRels.length + inRels.length) + ' relationships';
+    html += '</div>';
+    html += '</div>';
+
+    // Columns
+    html += '<div class="detail-section">';
+    html += '<h3>Columns (' + ent.columns.length + ')</h3>';
+    html += '<table class="col-table"><thead><tr><th>Name</th><th>Type</th><th></th></tr></thead><tbody>';
+    for (const col of ent.columns) {
+        const isPk = pkSet.has(col.name);
+        const isFk = fkSet.has(col.name);
+        let cls = '';
+        if (isPk) cls = 'col-pk';
+        else if (isFk) cls = 'col-fk';
+        else if (col.nullable) cls = 'col-nullable';
+
+        let badges = '';
+        if (isPk) badges += '<span class="pk-badge">PK</span>';
+        if (isFk) badges += '<span class="pk-badge" style="background:var(--accent)">FK</span>';
+
+        html += '<tr class="' + cls + '">';
+        html += '<td>' + escHtml(col.name) + '</td>';
+        html += '<td>' + escHtml(col.type) + (col.nullable ? '' : ' <b>NOT NULL</b>') + '</td>';
+        html += '<td>' + badges + '</td>';
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    html += '</div>';
+
+    // Outgoing relationships (FK from this table)
+    if (outRels.length) {
+        html += '<div class="detail-section">';
+        html += '<h3>References (' + outRels.length + ')</h3>';
+        for (const r of outRels) {
+            html += '<div class="rel-item" onclick="addEntity(\'' + escAttr(r.toTable) + '\')">';
+            html += '<span class="rel-arrow">&rarr;</span> ';
+            html += '<span>' + escHtml(r.toTable) + '</span> ';
+            html += '<span class="rel-col">(' + escHtml(r.fromColumn) + ' &rarr; ' + escHtml(r.toColumn) + ')</span>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    // Incoming relationships (FK to this table)
+    if (inRels.length) {
+        html += '<div class="detail-section">';
+        html += '<h3>Referenced By (' + inRels.length + ')</h3>';
+        for (const r of inRels) {
+            html += '<div class="rel-item" onclick="addEntity(\'' + escAttr(r.fromTable) + '\')">';
+            html += '<span class="rel-arrow">&larr;</span> ';
+            html += '<span>' + escHtml(r.fromTable) + '</span> ';
+            html += '<span class="rel-col">(' + escHtml(r.fromColumn) + ' &rarr; ' + escHtml(r.toColumn) + ')</span>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    dc.innerHTML = html;
+}
+
+function escAttr(s) {
+    return s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ── Layout ──
+function runLayout(name) {
+    if (!cy || cy.nodes().length === 0) return;
+
+    let opts = { name: name, animate: true, animationDuration: 400 };
+
+    if (name === 'fcose') {
+        opts = {
+            ...opts,
+            name: 'fcose',
+            quality: 'default',
+            randomize: true,
+            animate: true,
+            animationDuration: 500,
+            fit: true,
+            padding: 30,
+            nodeSeparation: 100,
+            idealEdgeLength: 120,
+            nodeRepulsion: node => 8000,
+            edgeElasticity: 0.45,
+        };
+    } else if (name === 'circle') {
+        opts = { ...opts, fit: true, padding: 30 };
+    } else if (name === 'grid') {
+        opts = { ...opts, fit: true, padding: 30, rows: Math.ceil(Math.sqrt(cy.nodes().length)) };
+    }
+
+    cy.layout(opts).run();
+}
+
+// ── Canvas operations ──
+function clearCanvas() {
+    cy.elements().remove();
+    onCanvas.clear();
+    selectedEntity = null;
+    document.getElementById('canvas-hint').classList.remove('hidden');
+    document.getElementById('detail-content').innerHTML = '<div class="empty-msg">Select a table to view details</div>';
+    document.getElementById('detail-close').style.display = 'none';
+    buildTableList(document.getElementById('table-filter').value);
+    updateStats();
+}
+
+function updateStats() {
+    const nodes = cy ? cy.nodes().length : 0;
+    const edges = cy ? cy.edges().length : 0;
+    document.getElementById('stats').textContent =
+        nodes + ' tables, ' + edges + ' relationships on canvas | ' +
+        data.metadata.entityCount + ' total tables, ' + data.metadata.relationshipCount + ' total relationships';
+}
+
+// ── Theme ──
+function toggleTheme() {
+    const body = document.body;
+    const btn = document.getElementById('theme-toggle');
+    if (body.classList.contains('light')) {
+        body.classList.remove('light');
+        btn.textContent = 'Light';
+    } else {
+        body.classList.add('light');
+        btn.textContent = 'Dark';
+    }
+    // Update node colors on canvas
+    cy.nodes().forEach(n => {
+        n.data('color', nodeColor(n.data('id')));
+        n.data('borderColor', nodeBorderColor(n.data('id')));
+    });
+}
+
+// ── Context Menu ──
+let ctxTarget = null;
+
+function showContextMenu(event, entityName) {
+    if (event && event.preventDefault) event.preventDefault();
+    ctxTarget = entityName;
+    const menu = document.getElementById('ctx-menu');
+    menu.style.display = 'block';
+
+    // Position near cursor but keep on screen
+    let x = event ? (event.clientX || event.pageX || 100) : 100;
+    let y = event ? (event.clientY || event.pageY || 100) : 100;
+    menu.style.left = Math.min(x, window.innerWidth - 200) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - 150) + 'px';
+}
+
+function hideContextMenu() {
+    document.getElementById('ctx-menu').style.display = 'none';
+    ctxTarget = null;
+}
+
+document.getElementById('ctx-expand').onclick = function() {
+    if (ctxTarget) expandEntity(ctxTarget);
+    hideContextMenu();
+};
+document.getElementById('ctx-select').onclick = function() {
+    if (ctxTarget) selectEntity(ctxTarget);
+    hideContextMenu();
+};
+document.getElementById('ctx-remove').onclick = function() {
+    if (ctxTarget) removeEntity(ctxTarget);
+    hideContextMenu();
+};
+document.addEventListener('click', hideContextMenu);
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', function(e) {
+    // Escape to close search or clear selection
+    if (e.key === 'Escape') {
+        if (searchResults.style.display === 'block') closeSearch();
+        else clearSelection();
+    }
+    // Ctrl+F or / to focus search
+    if ((e.ctrlKey && e.key === 'f') || (e.key === '/' && document.activeElement.tagName !== 'INPUT')) {
+        e.preventDefault();
+        searchInput.focus();
+    }
+    // Delete to remove selected node
+    if (e.key === 'Delete' && selectedEntity && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        removeEntity(selectedEntity);
+    }
+    // Ctrl+Enter to run SQL
+    if (e.ctrlKey && e.key === 'Enter' && document.getElementById('sql-panel').classList.contains('active')) {
+        e.preventDefault();
+        runSQL();
+    }
+});
+
+// ── Tab switching ──
+function switchTab(tab) {
+    document.querySelectorAll('#tab-bar .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    const cyContainer = document.getElementById('cy-container');
+    const sqlPanel = document.getElementById('sql-panel');
+    if (tab === 'er') {
+        cyContainer.classList.remove('hidden');
+        sqlPanel.classList.remove('active');
+    } else {
+        cyContainer.classList.add('hidden');
+        sqlPanel.classList.add('active');
+        loadSQLConnection();
+    }
+}
+
+// ── SQL Connection localStorage ──
+const SQL_STORAGE_KEY = 'dbstudio-connection';
+
+function saveSQLConnection() {
+    const conn = {
+        server: document.getElementById('sql-server').value,
+        database: document.getElementById('sql-database').value,
+        user: document.getElementById('sql-user').value,
+    };
+    localStorage.setItem(SQL_STORAGE_KEY, JSON.stringify(conn));
+}
+
+function loadSQLConnection() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(SQL_STORAGE_KEY));
+        if (saved) {
+            if (saved.server) document.getElementById('sql-server').value = saved.server;
+            if (saved.database) document.getElementById('sql-database').value = saved.database;
+            if (saved.user) document.getElementById('sql-user').value = saved.user;
+        }
+    } catch(e) {}
+}
+
+// Save connection fields on change
+['sql-server', 'sql-database', 'sql-user'].forEach(id => {
+    document.getElementById(id).addEventListener('change', saveSQLConnection);
+});
+
+// Load on startup
+loadSQLConnection();
+
+// ── SQL Query Execution ──
+async function runSQL() {
+    const query = document.getElementById('sql-editor').value.trim();
+    if (!query) return;
+
+    const server = document.getElementById('sql-server').value.trim();
+    const database = document.getElementById('sql-database').value.trim();
+    const user = document.getElementById('sql-user').value.trim();
+    const password = document.getElementById('sql-password').value;
+
+    if (!server || !user) {
+        showSQLMessage('Please fill in Server and User fields', true);
+        return;
+    }
+
+    saveSQLConnection();
+
+    const btn = document.getElementById('sql-run-btn');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    showSQLMessage('Executing query...', false);
+    document.getElementById('sql-results').innerHTML = '';
+
+    try {
+        const resp = await fetch('/api/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ server, database, user, password, query })
+        });
+
+        const result = await resp.json();
+
+        if (!resp.ok) {
+            showSQLMessage(result.detail || 'Query failed', true);
+            return;
+        }
+
+        showSQLMessage(result.message, false);
+
+        if (result.columns && result.columns.length) {
+            renderSQLResults(result.columns, result.rows);
+        }
+    } catch (e) {
+        showSQLMessage('Request failed: ' + e.message, true);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run';
+    }
+}
+
+function showSQLMessage(msg, isError) {
+    const el = document.getElementById('sql-message');
+    el.textContent = msg;
+    el.className = isError ? 'err' : '';
+}
+
+function renderSQLResults(columns, rows) {
+    const table = document.getElementById('sql-results');
+    let html = '<thead><tr>';
+    for (const col of columns) {
+        html += '<th>' + escHtml(col) + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+    for (const row of rows) {
+        html += '<tr>';
+        for (const val of row) {
+            if (val === null) {
+                html += '<td class="null-val">NULL</td>';
+            } else {
+                html += '<td>' + escHtml(val) + '</td>';
+            }
+        }
+        html += '</tr>';
+    }
+    html += '</tbody>';
+    table.innerHTML = html;
+}
+</script>
+</body>
+</html>
