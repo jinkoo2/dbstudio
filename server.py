@@ -114,8 +114,9 @@ def run_query(req: QueryRequest):
     if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
+    driver = get_config()["driver"]
     conn_str = (
-        f"DRIVER={{SQL Server}};"
+        f"DRIVER={{{driver}}};"
         f"SERVER={req.server};"
         f"DATABASE={req.database};"
         f"UID={req.user};"

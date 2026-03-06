@@ -15,6 +15,7 @@ load_dotenv(_ENV_PATH)
 def get_config():
     """Return database configuration from environment variables."""
     return {
+        "driver": os.environ.get("DB_DRIVER", "SQL Server"),
         "server": os.environ.get("DB_SERVER", ""),
         "user": os.environ.get("DB_USER", ""),
         "password": os.environ.get("DB_PASSWORD", ""),
@@ -26,8 +27,9 @@ def connect(config=None):
     """Create a pyodbc connection to the database."""
     if config is None:
         config = get_config()
+    driver = config.get("driver", "SQL Server")
     conn_str = (
-        f"DRIVER={{SQL Server}};"
+        f"DRIVER={{{driver}}};"
         f"SERVER={config['server']};"
         f"DATABASE={config['database']};"
         f"UID={config['user']};"

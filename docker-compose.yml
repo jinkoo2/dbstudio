@@ -1,0 +1,11 @@
+services:
+  dbstudio:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - DB_DRIVER=ODBC Driver 18 for SQL Server
+    volumes:
+      - ./data:/app/data
